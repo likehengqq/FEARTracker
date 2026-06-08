@@ -67,6 +67,24 @@ PYTHONPATH=. python evaluate/rk3588_export.py \
   --output_dir=outputs/rk3588
 ```
 
+`--weights_path` can point to `.ckpt`, `.pt`, or `.pth` files. The exporter supports:
+
+- PyTorch Lightning checkpoints with `checkpoint["state_dict"]`
+- plain `torch.save(model.state_dict(), "model.pt")` files
+- checkpoint dictionaries with `model_state_dict`, `model`, `net`, or `module` keys
+- complete `torch.save(model, "model.pt")` files
+
+For a plain `.pt` state dict:
+
+```shell
+PYTHONPATH=. python evaluate/rk3588_export.py \
+  --weights_path=/path/to/model.pt \
+  --config_path=model_training/config/model/fear.yaml \
+  --output_dir=outputs/rk3588
+```
+
+If the saved weights are compatible but do not exactly match every key in the configured model, retry with `--strict_weights=False`.
+
 If `rknn-toolkit2` is not available on the export machine, generate only ONNX files:
 
 ```shell
