@@ -1,0 +1,9 @@
+fire
+imageio
+imageio-ffmpeg
+numpy
+opencv-python-headless
+
+# Install Rockchip-provided wheels separately:
+# - rknn-toolkit2 on the x86_64 export host
+# - rknn-toolkit-lite2 on the RK3588 runtime device
