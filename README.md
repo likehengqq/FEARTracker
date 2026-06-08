@@ -52,6 +52,81 @@ This command will produce a file with the model in CoreML format (`Model.mlmodel
  ```
 2. Move converted model into the iOS project with the following command `cp Model_quantized.mlmodel evaluate/MeasurePerformance/MeasurePerformance/models/Model_quantized.mlmodel`.
 
+## RK3588 deployment
+
+RK3588 runs the tracker through Rockchip RKNN. The export path produces two models:
+
+1. `fear_template_encoder.rknn`: first-frame template crop `[1,3,128,128]` to template features `[1,256,8,8]`
+2. `fear_track.rknn`: search crop `[1,3,256,256]` plus template features to bbox/classification maps
+
+Install the normal training/export dependencies from `requirements.txt`, then install Rockchip's `rknn-toolkit2` wheel on the export machine. Export ONNX and RKNN from the project root:
+
+```shell
+PYTHONPATH=. python evaluate/rk3588_export.py \
+  --weights_path=evaluate/checkpoints/FEAR-XS-NoEmbs.ckpt \
+  --output_dir=outputs/rk3588
+```
+
+`--weights_path` can point to `.ckpt`, `.pt`, or `.pth` files. The exporter supports:
+
+- PyTorch Lightning checkpoints with `checkpoint["state_dict"]`
+- plain `torch.save(model.state_dict(), "model.pt")` files
+- checkpoint dictionaries with `model_state_dict`, `model`, `net`, or `module` keys
+- complete `torch.save(model, "model.pt")` files
+
+For a plain `.pt` state dict:
+
+```shell
+PYTHONPATH=. python evaluate/rk3588_export.py \
+  --weights_path=/path/to/model.pt \
+  --config_path=model_training/config/model/fear.yaml \
+  --output_dir=outputs/rk3588
+```
+
+If the saved weights are compatible but do not exactly match every key in the configured model, retry with `--strict_weights=False`.
+
+If `rknn-toolkit2` is not available on the export machine, generate only ONNX files:
+
+```shell
+PYTHONPATH=. python evaluate/rk3588_export.py --skip_rknn=True
+```
+
+For INT8 quantization, pass RKNN Toolkit2 calibration dataset files for both graphs:
+
+```shell
+PYTHONPATH=. python evaluate/rk3588_export.py \
+  --do_quantization=True \
+  --template_dataset=/path/to/template_dataset.txt \
+  --track_dataset=/path/to/track_dataset.txt
+```
+
+Copy `outputs/rk3588/fear_template_encoder.rknn` and `outputs/rk3588/fear_track.rknn` to the RK3588 board. On the board, install the lightweight runtime dependencies from `requirements-rk3588.txt` and Rockchip's `rknn-toolkit-lite2` wheel, then run:
+
+```shell
+PYTHONPATH=. python evaluate/rk3588_demo_video.py \
+  --template_model_path=outputs/rk3588/fear_template_encoder.rknn \
+  --track_model_path=outputs/rk3588/fear_track.rknn \
+  --initial_bbox='[163,53,45,174]' \
+  --video_path=assets/test.mp4 \
+  --output_path=outputs/rk3588/test.mp4
+```
+
+The RK3588 runtime tracker in `evaluate/rk3588_runtime.py` accepts RGB frames and `[x, y, width, height]` boxes, and only depends on `numpy`, `opencv-python-headless`, and `rknn-toolkit-lite2`.
+
+A C++ RKNN C API demo for RK3588 is available in `evaluate/rk3588_cpp`. Build it on the board with CMake and run it with the same two `.rknn` files:
+
+```shell
+cd evaluate/rk3588_cpp
+cmake -S . -B build -DRKNN_API_PATH=/path/to/rknn/runtime
+cmake --build build -j
+./build/fear_rk3588_demo \
+  --template_model ../../outputs/rk3588/fear_template_encoder.rknn \
+  --track_model ../../outputs/rk3588/fear_track.rknn \
+  --video ../../assets/test.mp4 \
+  --output ../../outputs/rk3588_cpp/test.mp4 \
+  --bbox 163,53,45,174
+```
+
 ### Count FLOPS and parameters
 ```shell
 PYTHONPATH=. python evaluate/macs_params.py
