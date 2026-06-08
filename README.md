@@ -95,6 +95,20 @@ PYTHONPATH=. python evaluate/rk3588_demo_video.py \
 
 The RK3588 runtime tracker in `evaluate/rk3588_runtime.py` accepts RGB frames and `[x, y, width, height]` boxes, and only depends on `numpy`, `opencv-python-headless`, and `rknn-toolkit-lite2`.
 
+A C++ RKNN C API demo for RK3588 is available in `evaluate/rk3588_cpp`. Build it on the board with CMake and run it with the same two `.rknn` files:
+
+```shell
+cd evaluate/rk3588_cpp
+cmake -S . -B build -DRKNN_API_PATH=/path/to/rknn/runtime
+cmake --build build -j
+./build/fear_rk3588_demo \
+  --template_model ../../outputs/rk3588/fear_template_encoder.rknn \
+  --track_model ../../outputs/rk3588/fear_track.rknn \
+  --video ../../assets/test.mp4 \
+  --output ../../outputs/rk3588_cpp/test.mp4 \
+  --bbox 163,53,45,174
+```
+
 ### Count FLOPS and parameters
 ```shell
 PYTHONPATH=. python evaluate/macs_params.py
