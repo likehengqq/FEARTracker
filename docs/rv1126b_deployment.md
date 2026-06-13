@@ -162,6 +162,47 @@ cmake --build build -j
 
 ---
 
+## 6.5 性能基准与精度对齐脚本
+
+仓库提供两个脚本帮助你在 RV1126B 上**实测帧率**并**量化评估精度损失**：
+
+### 真机性能基准 `evaluate/rk3588_benchmark.py`
+
+分段计时（模板分支一次 / 每帧预处理 / NPU 跟踪推理 / CPU 后处理 / 其它），输出端到端 FPS 与各段占比。
+RV1126B 是单核 NPU，`core_mask` 用 `auto`：
+
+```shell
+PYTHONPATH=. python evaluate/rk3588_benchmark.py \
+  --template_model_path=outputs/rv1126b/fear_template_encoder.rknn \
+  --track_model_path=outputs/rv1126b/fear_track.rknn \
+  --video_path=assets/test.mp4 --num_frames=300 --core_mask=auto
+```
+
+> 这是回答“RV1126B 上能跑多少 FPS”的**唯一可靠方式**——必须在真机上实测。脚本也支持
+> `--backend=onnx`（用 onnxruntime），但那只是用来在 PC 上验证脚本流程，**不代表板端性能**。
+> 经验上 FEAR 用了大量 depthwise 卷积，NPU 利用率通常不高，且每帧的 CPU 预处理/后处理常成为瓶颈，
+> 实测帧率往往明显低于按算力估的理论值。
+
+### 转换前后精度对齐 `evaluate/rk3588_accuracy.py`
+
+用同一组输入对比 PyTorch / ONNX / RKNN（模拟器，含可选 INT8 量化）的输出，逐输出报告
+最大绝对误差与余弦相似度，用于判断导出与量化是否引入明显误差：
+
+```shell
+# 仅 PyTorch vs ONNX（任意主机可跑）
+PYTHONPATH=. python evaluate/rk3588_accuracy.py \
+  --template_onnx=outputs/rv1126b/fear_template_encoder.onnx \
+  --track_onnx=outputs/rv1126b/fear_track.onnx
+
+# 加 RKNN 模拟器 + INT8 量化对比（需 rknn-toolkit2）
+PYTHONPATH=. python evaluate/rk3588_accuracy.py \
+  --target_platform=rv1126b --check_rknn=True --do_quantization=True \
+  --template_dataset=/path/to/template_dataset.txt \
+  --track_dataset=/path/to/track_dataset.txt
+```
+
+---
+
 ## 7. RV1126B 与 RK3588 的主要差异
 
 | 项目 | RK3588 | RV1126B |

@@ -127,7 +127,26 @@ cmake --build build -j
   --bbox 163,53,45,174
 ```
 
-> 在瑞芯微 **RV1126B** 上部署同样走 RKNN 工具链，可复用上面的导出脚本（导出时传 `--target_platform=rv1126b`）。详见
+### 性能基准与精度对齐
+
+实测帧率与评估量化精度损失（RK3588 与 RV1126B 通用）：
+
+```shell
+# 真机分段计时 + 端到端 FPS（板端单核 NPU 用 core_mask=auto，RK3588 多核可用 all）
+PYTHONPATH=. python evaluate/rk3588_benchmark.py \
+  --template_model_path=outputs/rk3588/fear_template_encoder.rknn \
+  --track_model_path=outputs/rk3588/fear_track.rknn \
+  --video_path=assets/test.mp4 --core_mask=auto
+
+# 转换前后逐输出精度对齐：PyTorch vs ONNX vs RKNN(模拟器/可选 INT8)
+PYTHONPATH=. python evaluate/rk3588_accuracy.py \
+  --template_onnx=outputs/rk3588/fear_template_encoder.onnx \
+  --track_onnx=outputs/rk3588/fear_track.onnx
+```
+
+两个脚本都支持 `--backend=onnx`（基准脚本）/ 默认 ONNX 对比（精度脚本），便于在没有板子的 PC 上先验证流程。
+
+> 在瑞芯微 **RV1126B** 上部署同样走 RKNN 工具链，可复用上面的导出/基准/精度脚本（导出时传 `--target_platform=rv1126b`）。详见
 > [`docs/rv1126b_deployment.md`](docs/rv1126b_deployment.md)。
 
 ### Count FLOPS and parameters
