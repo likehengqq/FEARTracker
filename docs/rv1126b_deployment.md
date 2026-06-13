@@ -164,7 +164,8 @@ cmake --build build -j
 
 ## 6.5 性能基准与精度对齐脚本
 
-仓库提供两个脚本帮助你在 RV1126B 上**实测帧率**并**量化评估精度损失**：
+仓库提供两个脚本帮助你在 RV1126B 上**实测帧率**并**量化评估精度损失**（完整参数、输出解读与校准集准备见
+[`docs/rknn_benchmark_accuracy.md`](rknn_benchmark_accuracy.md)）：
 
 ### 真机性能基准 `evaluate/rk3588_benchmark.py`
 

@@ -144,7 +144,7 @@ PYTHONPATH=. python evaluate/rk3588_accuracy.py \
   --track_onnx=outputs/rk3588/fear_track.onnx
 ```
 
-两个脚本都支持 `--backend=onnx`（基准脚本）/ 默认 ONNX 对比（精度脚本），便于在没有板子的 PC 上先验证流程。
+两个脚本都支持 `--backend=onnx`（基准脚本）/ 默认 ONNX 对比（精度脚本），便于在没有板子的 PC 上先验证流程。完整参数、输出解读与校准集准备见 [`docs/rknn_benchmark_accuracy.md`](docs/rknn_benchmark_accuracy.md)。
 
 > 在瑞芯微 **RV1126B** 上部署同样走 RKNN 工具链，可复用上面的导出/基准/精度脚本（导出时传 `--target_platform=rv1126b`）。详见
 > [`docs/rv1126b_deployment.md`](docs/rv1126b_deployment.md)。
