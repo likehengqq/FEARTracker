@@ -68,6 +68,18 @@ Also, you will need to select a development team under the signing & capabilitie
 
 **N.B.** The demo app does not contain bounding box smoothing postprocessing steps of the tracker so its output is slightly different from Python.
 
+## Deploy on HiSilicon Hi3519 (NNIE)
+To convert and run the FEAR tracker on HiSilicon Hi3519A / Hi3519A V100 (NNIE engine),
+first export the model to ONNX:
+```shell
+PYTHONPATH=. python evaluate/hi3519_convert.py --output_dir=outputs/hi3519
+```
+This produces NNIE-friendly sub-graphs (`fear_template.onnx`, `fear_track.onnx`) plus an
+I/O / preprocessing description (`fear_hi3519_meta.json`). The full conversion environment
+(HiSVP SDK, RuyiStudio / `nnie_mapper`, ONNX→Caffe, quantization calibration, operator
+compatibility and on-device integration) is documented in
+[`docs/hi3519_deployment.md`](docs/hi3519_deployment.md).
+
 ## Training
 ### Data preparation
 There are two dataset configurations. 
