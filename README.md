@@ -68,6 +68,18 @@ Also, you will need to select a development team under the signing & capabilitie
 
 **N.B.** The demo app does not contain bounding box smoothing postprocessing steps of the tracker so its output is slightly different from Python.
 
+## 在海思 Hi3519（NNIE）上部署
+要把 FEAR 跟踪器转换并运行在海思 Hi3519A / Hi3519A V100（NNIE 引擎）上，
+首先把模型导出为 ONNX：
+```shell
+PYTHONPATH=. python evaluate/hi3519_convert.py --output_dir=outputs/hi3519
+```
+该命令会生成对 NNIE 友好的子图（`fear_template.onnx`、`fear_track.onnx`），以及输入输出 /
+预处理描述文件（`fear_hi3519_meta.json`）。完整的转换环境
+（HiSVP SDK、RuyiStudio / `nnie_mapper`、ONNX→Caffe、量化校准、算子兼容性
+与板端集成）详见
+[`docs/hi3519_deployment.md`](docs/hi3519_deployment.md)。
+
 ## Training
 ### Data preparation
 There are two dataset configurations. 
