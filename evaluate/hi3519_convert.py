@@ -1,32 +1,29 @@
-"""Export the FEAR tracker to ONNX for HiSilicon Hi3519 (NNIE) deployment.
+"""将 FEAR 跟踪器导出为 ONNX，用于海思 Hi3519（NNIE）部署。
 
-The Hi3519 NNIE toolchain (RuyiStudio / nnie_mapper) consumes a Caffe 1.0 or
-ONNX model and produces a quantized ``.wk`` file. This script performs the
-first step of that pipeline: it splits the FEAR tracker into two NNIE-friendly
-sub-graphs and exports each to ONNX.
+Hi3519 的 NNIE 工具链（RuyiStudio / nnie_mapper）接受 Caffe 1.0 或 ONNX 模型，
+并生成量化后的 ``.wk`` 文件。本脚本完成该链路的第一步：把 FEAR 跟踪器拆成两个
+对 NNIE 友好的子图，并分别导出为 ONNX。
 
-The tracker runs in two phases (mirroring ``demo_video.py`` / the CoreML
-export in ``coreml_convert.py``):
+跟踪器分两个阶段运行（与 ``demo_video.py`` / ``coreml_convert.py`` 的 CoreML 导出一致）：
 
-1. **Template branch** -- run once when the target is initialised:
-   ``template image [1, 3, 128, 128]  ->  template_features [1, 256, 8, 8]``
+1. **模板分支** —— 仅在跟踪初始化时运行一次：
+   ``模板图像 [1, 3, 128, 128]  ->  模板特征 template_features [1, 256, 8, 8]``
 
-2. **Track / search branch** -- run on every frame:
-   ``search image [1, 3, 256, 256] + template_features [1, 256, 8, 8]
+2. **跟踪/搜索分支** —— 每帧运行：
+   ``搜索图像 search [1, 3, 256, 256] + 模板特征 template_features [1, 256, 8, 8]
      ->  bbox [1, 4, 16, 16], cls [1, 1, 16, 16]``
 
-Both branches are pure conv / depthwise-conv / BN / ReLU graphs *except* for
-two operators that the Hi3519 NNIE engine does not support natively and that
-should be implemented on the ARM/DSP side (see ``docs/hi3519_deployment.md``):
+除以下两个算子外，两个分支都是纯 conv / depthwise-conv / BN / ReLU 计算图。
+这两个算子 Hi3519 NNIE 引擎不原生支持，应放到 ARM/DSP 端实现
+（详见 ``docs/hi3519_deployment.md``）：
 
-* the cross-correlation ``torch.matmul`` inside ``MobileCorrelation``;
-* the final ``torch.exp`` applied to the bbox regression map.
+* ``MobileCorrelation`` 内部的互相关 ``torch.matmul``；
+* 对 bbox 回归图施加的最后那个 ``torch.exp``。
 
-By default these are kept inside the exported graph so the ONNX file is a
-faithful copy of the PyTorch model; use ``--split_postprocess`` notes in the
-deployment doc if your NNIE SDK version rejects those ops.
+默认情况下这两个算子仍保留在导出的计算图中，使 ONNX 文件与 PyTorch 模型完全一致；
+若你的 NNIE SDK 版本拒绝这些算子，请参考部署文档中的网络拆分策略。
 
-Usage::
+用法::
 
     PYTHONPATH=. python evaluate/hi3519_convert.py \
         --weights_path=evaluate/checkpoints/FEAR-XS-NoEmbs.ckpt \
@@ -44,9 +41,8 @@ from hydra.utils import instantiate
 from model_training.utils.hydra import load_yaml
 from model_training.utils.torch import load_from_lighting
 
-# NNIE mapper expects the normalisation to be configured in its prototxt
-# (data_scale / mean file). These match the training-time preprocessing in
-# model_training/tracker/base_tracker.py and the CoreML export.
+# NNIE mapper 需要在其 prototxt（data_scale / mean 文件）中配置归一化参数。
+# 下列取值与 model_training/tracker/base_tracker.py 中训练时的预处理以及 CoreML 导出一致。
 _MEAN = [0.485, 0.456, 0.406]
 _STD = [0.229, 0.224, 0.225]
 
@@ -56,7 +52,7 @@ TEMPLATE_FEATURES_SHAPE = [1, 256, 8, 8]
 
 
 class TemplateBranch(torch.nn.Module):
-    """Initialisation graph: template image -> template features."""
+    """初始化计算图：模板图像 -> 模板特征。"""
 
     def __init__(self, model: torch.nn.Module) -> None:
         super().__init__()
@@ -67,7 +63,7 @@ class TemplateBranch(torch.nn.Module):
 
 
 class TrackBranch(torch.nn.Module):
-    """Per-frame graph: search image + template features -> bbox, cls."""
+    """每帧计算图：搜索图像 + 模板特征 -> bbox, cls。"""
 
     def __init__(self, model: torch.nn.Module) -> None:
         super().__init__()
@@ -88,11 +84,10 @@ def _export(module: torch.nn.Module, args: Tuple[torch.Tensor, ...], input_names
         do_constant_folding=True,
         input_names=input_names,
         output_names=output_names,
-        # Hi3519 NNIE only supports fixed input shapes, so do NOT mark any axis
-        # as dynamic. Batch size is pinned to 1.
+        # Hi3519 NNIE 仅支持固定输入尺寸，因此不要把任何维度标记为动态。batch 固定为 1。
         dynamic_axes=None,
     )
-    print(f"[ok] exported {path}")
+    print(f"[ok] 已导出 {path}")
 
 
 def _verify(module: torch.nn.Module, args: Tuple[torch.Tensor, ...], output_names, path: str) -> None:
@@ -100,7 +95,7 @@ def _verify(module: torch.nn.Module, args: Tuple[torch.Tensor, ...], output_name
         import onnx
         import onnxruntime as ort
     except ImportError:
-        print("[skip] onnx / onnxruntime not installed, skipping numerical verification")
+        print("[skip] 未安装 onnx / onnxruntime，跳过数值校验")
         return
 
     onnx.checker.check_model(onnx.load(path))
@@ -116,7 +111,7 @@ def _verify(module: torch.nn.Module, args: Tuple[torch.Tensor, ...], output_name
     for name, t, o in zip(output_names, torch_out, ort_out):
         diff = float(np.abs(t.cpu().numpy() - o).max())
         status = "ok" if diff < 1e-3 else "WARN"
-        print(f"[{status}] {os.path.basename(path)}::{name} max|torch-onnx| = {diff:.2e}")
+        print(f"[{status}] {os.path.basename(path)}::{name} 最大绝对误差|torch-onnx| = {diff:.2e}")
 
 
 def main(
@@ -150,36 +145,36 @@ def main(
         _verify(template_branch, template_inp, ["template_features"], template_path)
         _verify(track_branch, track_inp, ["bbox", "cls"], track_path)
 
-    # Preprocessing / IO description that the NNIE mapper prototxt must match.
+    # NNIE mapper 的 prototxt 必须与下列预处理 / 输入输出描述保持一致。
     meta = {
         "opset": opset,
         "preprocess": {
             "color": "RGB",
             "mean_0_1": _MEAN,
             "std_0_1": _STD,
-            "comment": "pixel/255 then (x-mean)/std; for NNIE set img_norm + data_scale accordingly",
+            "comment": "先 pixel/255，再 (x-mean)/std；NNIE 中需相应配置 img_norm + data_scale",
         },
         "graphs": {
             "fear_template.onnx": {
                 "inputs": {"template": TEMPLATE_SHAPE},
                 "outputs": {"template_features": TEMPLATE_FEATURES_SHAPE},
-                "run": "once on target initialisation",
+                "run": "跟踪初始化时运行一次",
             },
             "fear_track.onnx": {
                 "inputs": {"search": SEARCH_SHAPE, "template_features": TEMPLATE_FEATURES_SHAPE},
                 "outputs": {"bbox": [1, 4, 16, 16], "cls": [1, 1, 16, 16]},
-                "run": "every frame",
+                "run": "每帧运行",
             },
         },
         "unsupported_by_nnie": [
-            "MobileCorrelation matmul (cross-correlation) -- run on CPU/DSP",
-            "torch.exp on bbox regression map -- run on CPU/DSP",
+            "MobileCorrelation 的 matmul（互相关）—— 放到 CPU/DSP 执行",
+            "bbox 回归图上的 torch.exp —— 放到 CPU/DSP 执行",
         ],
     }
     meta_path = os.path.join(output_dir, "fear_hi3519_meta.json")
     with open(meta_path, "w") as f:
-        json.dump(meta, f, indent=2)
-    print(f"[ok] wrote {meta_path}")
+        json.dump(meta, f, indent=2, ensure_ascii=False)
+    print(f"[ok] 已写入 {meta_path}")
 
 
 if __name__ == "__main__":
