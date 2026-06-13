@@ -542,15 +542,15 @@ BBox ParseBBox(const std::string& text) {
 }
 
 void PrintUsage(const char* program) {
-  std::cout << "Usage: " << program << " [options]\n"
-            << "Options:\n"
-            << "  --template_model PATH  RKNN template encoder model\n"
-            << "  --track_model PATH     RKNN tracking model\n"
-            << "  --video PATH           Input video path\n"
-            << "  --output PATH          Output video path\n"
-            << "  --bbox x,y,w,h         Initial bbox, default 163,53,45,174\n"
-            << "  --core auto|0|1|2|all  RK3588 NPU core mask, default auto\n"
-            << "  --help                 Show this help\n";
+  std::cout << "用法: " << program << " [选项]\n"
+            << "选项:\n"
+            << "  --template_model PATH  RKNN 模板编码器模型\n"
+            << "  --track_model PATH     RKNN 跟踪模型\n"
+            << "  --video PATH           输入视频路径\n"
+            << "  --output PATH          输出视频路径\n"
+            << "  --bbox x,y,w,h         首帧初始框，默认 163,53,45,174\n"
+            << "  --core auto|0|1|2|all  RK3588 NPU 核心掩码，默认 auto\n"
+            << "  --help                 显示本帮助信息\n";
 }
 
 Args ParseArgs(int argc, char** argv) {
@@ -645,11 +645,11 @@ int main(int argc, char** argv) {
       current_bbox = update.first;
       ++frame_index;
       if (frame_index % 30 == 0) {
-        std::cout << "Processed " << frame_index << " frames, score=" << update.second << std::endl;
+        std::cout << "已处理 " << frame_index << " 帧, score=" << update.second << std::endl;
       }
     }
 
-    std::cout << "Wrote output video to " << args.output_path << std::endl;
+    std::cout << "已写入输出视频: " << args.output_path << std::endl;
     return 0;
   } catch (const std::exception& exc) {
     std::cerr << "Error: " << exc.what() << std::endl;

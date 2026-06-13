@@ -1,18 +1,18 @@
-# FEAR RK3588 C++ inference demo
+# FEAR RK3588 C++ 推理 demo
 
-This directory contains a C++ RKNN inference demo for RK3588 boards. It uses:
+本目录提供面向 RK3588 开发板的 C++ RKNN 推理 demo，使用：
 
-- Rockchip RKNN C runtime (`rknn_api.h`, `librknnrt.so`)
-- OpenCV for video I/O, resize, padding, color conversion, and drawing
+- 瑞芯微 RKNN C 运行时（`rknn_api.h`、`librknnrt.so`）
+- OpenCV，用于视频读写、缩放、padding、颜色转换与画框
 
-The demo expects the two `.rknn` files exported by `evaluate/rk3588_export.py`:
+该 demo 需要由 `evaluate/rk3588_export.py` 导出的两个 `.rknn` 文件：
 
 - `fear_template_encoder.rknn`
 - `fear_track.rknn`
 
-## Build on RK3588
+## 在 RK3588 上编译
 
-Install OpenCV development files and Rockchip RKNN runtime first. If RKNN headers and libraries are not in a system path, point CMake to the runtime package with `RKNN_API_PATH`.
+请先安装 OpenCV 开发文件与瑞芯微 RKNN 运行时。如果 RKNN 的头文件和库不在系统路径下，可通过 `RKNN_API_PATH` 把 CMake 指向运行时包。
 
 ```shell
 cd evaluate/rk3588_cpp
@@ -20,9 +20,9 @@ cmake -S . -B build -DRKNN_API_PATH=/path/to/rknn/runtime
 cmake --build build -j
 ```
 
-If `rknn_api.h` and `librknnrt.so` are already installed under `/usr/include` and `/usr/lib`, `-DRKNN_API_PATH=...` can be omitted.
+如果 `rknn_api.h` 与 `librknnrt.so` 已经安装在 `/usr/include` 与 `/usr/lib` 下，则可以省略 `-DRKNN_API_PATH=...`。
 
-## Run
+## 运行
 
 ```shell
 ./build/fear_rk3588_demo \
@@ -34,9 +34,9 @@ If `rknn_api.h` and `librknnrt.so` are already installed under `/usr/include` an
   --core auto
 ```
 
-Options:
+选项：
 
-- `--bbox x,y,w,h`: initial object box in the first frame
-- `--core auto|0|1|2|all`: RK3588 NPU core mask
+- `--bbox x,y,w,h`：首帧中要跟踪目标的初始框
+- `--core auto|0|1|2|all`：RK3588 NPU 核心掩码
 
-OpenCV reads video frames as BGR. The demo converts each frame to RGB before model preprocessing, matching the Python tracker normalization.
+OpenCV 以 BGR 读取视频帧。该 demo 在做模型预处理前会把每帧转换为 RGB，与 Python 端跟踪器的归一化保持一致。
