@@ -130,3 +130,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# pip editable install clone for mobile_cv (-e git+... in requirements.txt)
+/src/
+
+# demo / inference outputs
+/outputs/
