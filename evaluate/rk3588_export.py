@@ -81,8 +81,8 @@ def _normalize_state_dict_keys(state_dict: Dict[str, torch.Tensor]) -> Dict[str,
             state_dict = {key[len(prefix):]: value for key, value in state_dict.items()}
             keys = list(state_dict.keys())
 
-    # PyTorch Lightning checkpoints often store the network under "model.*"
-    # together with other module state. Keep the model subtree if it is present.
+    # PyTorch Lightning 的 checkpoint 通常把网络权重存放在 "model.*" 下，
+    # 同时还包含其他模块状态。若存在 model 子树则只保留它。
     model_state = {key[len("model."):]: value for key, value in state_dict.items() if key.startswith("model.")}
     if model_state:
         return model_state
@@ -190,20 +190,22 @@ def main(
     strict_weights: bool = True,
 ) -> None:
     """
-    Export FEAR for RK3588 deployment.
+    导出 FEAR 模型用于 RK3588 部署。
 
-    The tracker is exported as two graphs:
-    1. template encoder: template image [1,3,128,128] -> template features [1,256,8,8]
-    2. tracking head: search image [1,3,256,256] + template features -> bbox/cls maps
+    跟踪器被拆成两个计算图导出：
+    1. 模板编码器：模板图像 [1,3,128,128] -> 模板特征 [1,256,8,8]
+    2. 跟踪头：搜索图像 [1,3,256,256] + 模板特征 -> bbox / cls 图
 
-    Quantization datasets are RKNN Toolkit2 dataset text files. For the tracking
-    graph each line must provide both inputs in Toolkit2's multi-input format.
+    量化数据集为 RKNN Toolkit2 的数据集文本文件。对于跟踪图，每一行都必须
+    按 Toolkit2 的多输入格式同时提供两个输入。
 
-    Supported weights_path formats:
-    - PyTorch Lightning checkpoints with checkpoint["state_dict"]
-    - plain torch.save(model.state_dict()) .pt/.pth files
-    - checkpoints with model_state_dict/model/net/module keys
-    - complete torch.save(model) files
+    支持的 weights_path 格式：
+    - 含 checkpoint["state_dict"] 的 PyTorch Lightning checkpoint
+    - 直接 torch.save(model.state_dict()) 保存的 .pt/.pth 文件
+    - 含 model_state_dict/model/net/module 键的 checkpoint
+    - 用 torch.save(model) 保存的完整模型文件
+
+    通过 target_platform 参数可切换目标芯片（例如 RV1126B 传 target_platform="rv1126b"）。
     """
     output_root = Path(output_dir)
     model = _load_model(config_path=config_path, weights_path=weights_path, strict_weights=strict_weights)
@@ -235,7 +237,7 @@ def main(
     )
 
     if skip_rknn:
-        print("Exported ONNX models to {}".format(output_root))
+        print("已导出 ONNX 模型到 {}".format(output_root))
         return
 
     _build_rknn(
@@ -252,7 +254,7 @@ def main(
         do_quantization=do_quantization,
         dataset=track_dataset,
     )
-    print("Exported RKNN models to {}".format(os.fspath(output_root)))
+    print("已导出 RKNN 模型到 {}".format(os.fspath(output_root)))
 
 
 if __name__ == "__main__":

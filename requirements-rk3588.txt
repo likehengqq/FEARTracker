@@ -4,6 +4,6 @@ imageio-ffmpeg
 numpy
 opencv-python-headless
 
-# Install Rockchip-provided wheels separately:
-# - rknn-toolkit2 on the x86_64 export host
-# - rknn-toolkit-lite2 on the RK3588 runtime device
+# 瑞芯微提供的 whl 包需单独安装：
+# - 在 x86_64 导出主机上安装 rknn-toolkit2
+# - 在 RK3588 运行设备上安装 rknn-toolkit-lite2

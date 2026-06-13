@@ -132,9 +132,12 @@ def _nchw(output: np.ndarray, channels: int) -> np.ndarray:
 
 class RK3588FEARTracker:
     """
-    FEAR tracker backed by two RKNNLite models on RK3588.
+    在 RK3588 上由两个 RKNNLite 模型驱动的 FEAR 跟踪器。
 
-    Input frames must be RGB numpy arrays. Bounding boxes use [x, y, width, height].
+    同样适用于其他走 RKNN 工具链的瑞芯微芯片（如 RV1126B），只需替换为对应平台导出的
+    .rknn 模型；注意单核 NPU 平台（如 RV1126B）的 core_mask 应使用 "auto"。
+
+    输入帧必须是 RGB 的 numpy 数组。边界框格式为 [x, y, width, height]。
     """
 
     def __init__(

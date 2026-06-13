@@ -52,14 +52,14 @@ This command will produce a file with the model in CoreML format (`Model.mlmodel
  ```
 2. Move converted model into the iOS project with the following command `cp Model_quantized.mlmodel evaluate/MeasurePerformance/MeasurePerformance/models/Model_quantized.mlmodel`.
 
-## RK3588 deployment
+## 在 RK3588 上部署
 
-RK3588 runs the tracker through Rockchip RKNN. The export path produces two models:
+RK3588 通过瑞芯微（Rockchip）RKNN 运行跟踪器。导出流程会生成两个模型：
 
-1. `fear_template_encoder.rknn`: first-frame template crop `[1,3,128,128]` to template features `[1,256,8,8]`
-2. `fear_track.rknn`: search crop `[1,3,256,256]` plus template features to bbox/classification maps
+1. `fear_template_encoder.rknn`：首帧模板裁剪 `[1,3,128,128]` → 模板特征 `[1,256,8,8]`
+2. `fear_track.rknn`：搜索裁剪 `[1,3,256,256]` + 模板特征 → bbox / 分类图
 
-Install the normal training/export dependencies from `requirements.txt`, then install Rockchip's `rknn-toolkit2` wheel on the export machine. Export ONNX and RKNN from the project root:
+先按 `requirements.txt` 安装常规的训练/导出依赖，再在导出机器上安装瑞芯微的 `rknn-toolkit2` whl 包。在项目根目录导出 ONNX 与 RKNN：
 
 ```shell
 PYTHONPATH=. python evaluate/rk3588_export.py \
@@ -67,14 +67,14 @@ PYTHONPATH=. python evaluate/rk3588_export.py \
   --output_dir=outputs/rk3588
 ```
 
-`--weights_path` can point to `.ckpt`, `.pt`, or `.pth` files. The exporter supports:
+`--weights_path` 可以指向 `.ckpt`、`.pt` 或 `.pth` 文件。导出脚本支持以下权重格式：
 
-- PyTorch Lightning checkpoints with `checkpoint["state_dict"]`
-- plain `torch.save(model.state_dict(), "model.pt")` files
-- checkpoint dictionaries with `model_state_dict`, `model`, `net`, or `module` keys
-- complete `torch.save(model, "model.pt")` files
+- 含 `checkpoint["state_dict"]` 的 PyTorch Lightning checkpoint
+- 直接用 `torch.save(model.state_dict(), "model.pt")` 保存的文件
+- 含 `model_state_dict`、`model`、`net` 或 `module` 键的 checkpoint 字典
+- 用 `torch.save(model, "model.pt")` 保存的完整模型文件
 
-For a plain `.pt` state dict:
+对于普通的 `.pt` state dict：
 
 ```shell
 PYTHONPATH=. python evaluate/rk3588_export.py \
@@ -83,15 +83,15 @@ PYTHONPATH=. python evaluate/rk3588_export.py \
   --output_dir=outputs/rk3588
 ```
 
-If the saved weights are compatible but do not exactly match every key in the configured model, retry with `--strict_weights=False`.
+如果保存的权重兼容、但与所配置模型的每个键不完全匹配，可加 `--strict_weights=False` 重试。
 
-If `rknn-toolkit2` is not available on the export machine, generate only ONNX files:
+如果导出机器上没有 `rknn-toolkit2`，可以只生成 ONNX 文件：
 
 ```shell
 PYTHONPATH=. python evaluate/rk3588_export.py --skip_rknn=True
 ```
 
-For INT8 quantization, pass RKNN Toolkit2 calibration dataset files for both graphs:
+如需 INT8 量化，请为两个子图分别传入 RKNN Toolkit2 的校准数据集文件：
 
 ```shell
 PYTHONPATH=. python evaluate/rk3588_export.py \
@@ -100,7 +100,7 @@ PYTHONPATH=. python evaluate/rk3588_export.py \
   --track_dataset=/path/to/track_dataset.txt
 ```
 
-Copy `outputs/rk3588/fear_template_encoder.rknn` and `outputs/rk3588/fear_track.rknn` to the RK3588 board. On the board, install the lightweight runtime dependencies from `requirements-rk3588.txt` and Rockchip's `rknn-toolkit-lite2` wheel, then run:
+把 `outputs/rk3588/fear_template_encoder.rknn` 和 `outputs/rk3588/fear_track.rknn` 拷贝到 RK3588 开发板。在板上按 `requirements-rk3588.txt` 安装轻量运行时依赖以及瑞芯微的 `rknn-toolkit-lite2` whl 包，然后运行：
 
 ```shell
 PYTHONPATH=. python evaluate/rk3588_demo_video.py \
@@ -111,9 +111,9 @@ PYTHONPATH=. python evaluate/rk3588_demo_video.py \
   --output_path=outputs/rk3588/test.mp4
 ```
 
-The RK3588 runtime tracker in `evaluate/rk3588_runtime.py` accepts RGB frames and `[x, y, width, height]` boxes, and only depends on `numpy`, `opencv-python-headless`, and `rknn-toolkit-lite2`.
+`evaluate/rk3588_runtime.py` 中的 RK3588 运行时跟踪器接受 RGB 帧与 `[x, y, width, height]` 格式的框，仅依赖 `numpy`、`opencv-python-headless` 和 `rknn-toolkit-lite2`。
 
-A C++ RKNN C API demo for RK3588 is available in `evaluate/rk3588_cpp`. Build it on the board with CMake and run it with the same two `.rknn` files:
+`evaluate/rk3588_cpp` 提供了一个基于 RKNN C API 的 C++ demo。在板上用 CMake 编译，并使用同样的两个 `.rknn` 文件运行：
 
 ```shell
 cd evaluate/rk3588_cpp
@@ -126,6 +126,28 @@ cmake --build build -j
   --output ../../outputs/rk3588_cpp/test.mp4 \
   --bbox 163,53,45,174
 ```
+
+### 性能基准与精度对齐
+
+实测帧率与评估量化精度损失（RK3588 与 RV1126B 通用）：
+
+```shell
+# 真机分段计时 + 端到端 FPS（板端单核 NPU 用 core_mask=auto，RK3588 多核可用 all）
+PYTHONPATH=. python evaluate/rk3588_benchmark.py \
+  --template_model_path=outputs/rk3588/fear_template_encoder.rknn \
+  --track_model_path=outputs/rk3588/fear_track.rknn \
+  --video_path=assets/test.mp4 --core_mask=auto
+
+# 转换前后逐输出精度对齐：PyTorch vs ONNX vs RKNN(模拟器/可选 INT8)
+PYTHONPATH=. python evaluate/rk3588_accuracy.py \
+  --template_onnx=outputs/rk3588/fear_template_encoder.onnx \
+  --track_onnx=outputs/rk3588/fear_track.onnx
+```
+
+两个脚本都支持 `--backend=onnx`（基准脚本）/ 默认 ONNX 对比（精度脚本），便于在没有板子的 PC 上先验证流程。完整参数、输出解读与校准集准备见 [`docs/rknn_benchmark_accuracy.md`](docs/rknn_benchmark_accuracy.md)。
+
+> 在瑞芯微 **RV1126B** 上部署同样走 RKNN 工具链，可复用上面的导出/基准/精度脚本（导出时传 `--target_platform=rv1126b`）。详见
+> [`docs/rv1126b_deployment.md`](docs/rv1126b_deployment.md)。
 
 ### Count FLOPS and parameters
 ```shell
