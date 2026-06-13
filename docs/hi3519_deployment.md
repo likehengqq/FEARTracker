@@ -190,6 +190,49 @@ NNIE 1.x **不支持任意 MatMul 与 Exp**，动态 reshape 也不友好。推�
 
 ---
 
+## 7.5 板端实现与分段基准（仓库已提供，方式 A 的落地）
+
+仓库按上面的「方式 A」给出了一套可直接参考的板端实现：把**骨干特征提取放 NNIE**，把
+**BoxTower 头部（互相关 MatMul + Exp + 卷积塔 + 解码）放 ARM CPU**。该切分在数值上与原始
+`track()` **完全等价**（验证误差 0）。
+
+### 三段式导出
+
+```shell
+# 两个 NNIE 骨干 ONNX（模板 8x8 / 搜索 16x16）+ 一个 CPU 头部 ONNX
+PYTHONPATH=. python evaluate/hi3519_split_export.py --output_dir=outputs/hi3519_split
+# CPU 头部权重（已折叠 BatchNorm）+ C++ 自检参考数据
+PYTHONPATH=. python evaluate/hi3519_dump_head.py   --output_dir=outputs/hi3519_split
+```
+
+把两个骨干 ONNX 按第 4~5 节转成 `.wk`；头部用导出的 `hi3519_head_weights.bin`。
+
+### Python 参考运行时与分段基准（PC 可验证）
+
+- `evaluate/hi3519_runtime.py`：`Hi3519FEARTracker`（NNIE 骨干 + CPU 头部 + 跟踪流水线），
+  默认 `backend=onnx`（用 onnxruntime 模拟三段，便于在 PC 上验证整条流水线与 PyTorch 一致）。
+- `evaluate/hi3519_demo_video.py`：跑视频输出带框结果，可与 `demo_video.py` 对比，结果应完全一致。
+- `evaluate/hi3519_benchmark.py`：**分段基准**——分别计时 预处理 / NNIE 骨干(搜索) / CPU 头部 /
+  解码 / 其它，并输出端到端 FPS。
+
+```shell
+PYTHONPATH=. python evaluate/hi3519_demo_video.py --output_dir=outputs/hi3519_split
+PYTHONPATH=. python evaluate/hi3519_benchmark.py  --output_dir=outputs/hi3519_split --video_path=assets/test.mp4
+```
+
+> 注意：`backend=onnx` 下「NNIE 骨干」一栏是 CPU 上 onnxruntime 的耗时，**不代表 Hi3519 NNIE 的真实性能**；
+> 真实分段耗时与 FPS 需在板端用下面的 C++/NNIE 实现测量。
+
+### C++ 板端实现 `evaluate/hi3519_cpp/`
+
+- `fear_head.hpp`：CPU 头部段的纯标准库实现（depthwise+pointwise 卷积、互相关、exp、解码）。
+- `test_fear_head.cpp`：头部数值自检，**已编译运行并与 PyTorch 数值一致**（bbox 误差 ~1e-4、cls ~6e-6）。
+- `fear_hi3519_demo.cpp`：完整板端 demo（NNIE 骨干 + CPU 头部 + OpenCV）；NNIE 骨干通过 HiSVP
+  NNIE API 运行（`#ifdef USE_HISVP`，需 SVP SDK，按板端适配）。
+- 详见 `evaluate/hi3519_cpp/README.md`。
+
+---
+
 ## 8. 精度验证与常见问题
 
 - **逐层比对**：先用 `onnxruntime` 确认 ONNX 与 PyTorch 一致（脚本已自动做），再用 RuyiStudio 的向量对比确认量化前后误差；INT16 通常精度损失很小，INT8 若掉点明显可对敏感层保留 INT16。
