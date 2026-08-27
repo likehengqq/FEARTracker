@@ -52,9 +52,12 @@ class FEARLightningModel(BaseLightningModel):
         self.dataset_aware_metric = DatasetAwareMetric(metric_name="box_iou", metric_fn=box_iou_metric)
         #ToDo: Move loss creation to Hydra
         self.criterion = FEARLoss(coeffs=config["loss"]["coeffs"])
+        self.train_metric_interval = int(config.get("train_metric_interval", 50))
+        self._last_train_outputs = None
 
     def training_step(self, batch: Dict[str, Any], batch_nb: int):
         loss, outputs = self._training_step(batch=batch, batch_nb=batch_nb)
+        self._last_train_outputs = outputs
         return loss
 
     def _training_step(self, batch: Dict[str, Any], batch_nb: int):
@@ -63,28 +66,30 @@ class FEARLightningModel(BaseLightningModel):
         loss = self.criterion(outputs, targets)
         total_loss, loss_dict = self.compute_loss(loss)
 
-        decoded_info: TrackerDecodeResult = self.box_coder.decode(
-            classification_map=outputs[TARGET_CLASSIFICATION_KEY],
-            regression_map=outputs[TARGET_REGRESSION_LABEL_KEY],
-        )
-        pred_boxes = box_convert(decoded_info.bbox, "xywh", "xyxy")
-        gt_boxes = box_convert(targets[TRACKER_TARGET_BBOX_KEY], "xywh", "xyxy")
-        visibility_mask = (targets[TARGET_VISIBILITY_KEY][:, 0] == 1).tolist()
-        datasets = list(np.array(batch[DATASET_NAME_KEY])[visibility_mask])
-        pred_boxes = pred_boxes[visibility_mask]
-        gt_boxes = gt_boxes[visibility_mask]
-        ious = box_iou(pred_boxes, gt_boxes)
-
-        metrics = self.metrics(ious)
-
-        for metric_name, metric_value in metrics.items():
-            self.log(
-                f"train/metrics/{metric_name}",
-                metric_value,
-                on_epoch=True,
+        should_log_metrics = self.train_metric_interval <= 1 or (batch_nb % self.train_metric_interval == 0)
+        if should_log_metrics:
+            decoded_info: TrackerDecodeResult = self.box_coder.decode(
+                classification_map=outputs[TARGET_CLASSIFICATION_KEY],
+                regression_map=outputs[TARGET_REGRESSION_LABEL_KEY],
             )
+            pred_boxes = box_convert(decoded_info.bbox, "xywh", "xyxy")
+            gt_boxes = box_convert(targets[TRACKER_TARGET_BBOX_KEY], "xywh", "xyxy")
+            visibility_mask = (targets[TARGET_VISIBILITY_KEY][:, 0] == 1).tolist()
+            datasets = list(np.array(batch[DATASET_NAME_KEY])[visibility_mask])
+            pred_boxes = pred_boxes[visibility_mask]
+            gt_boxes = gt_boxes[visibility_mask]
+            ious = box_iou(pred_boxes, gt_boxes)
 
-        self.dataset_aware_metric.update(mode="train", datasets=datasets, outputs=ious)
+            metrics = self.metrics(ious)
+
+            for metric_name, metric_value in metrics.items():
+                self.log(
+                    f"train/metrics/{metric_name}",
+                    metric_value,
+                    on_epoch=True,
+                )
+
+            self.dataset_aware_metric.update(mode="train", datasets=datasets, outputs=ious)
         self.log(f"train/loss", total_loss, prog_bar=True, sync_dist=self.use_ddp)
         for key, loss in loss_dict.items():
             self.log(f"train/{key}_loss", loss, sync_dist=self.use_ddp)

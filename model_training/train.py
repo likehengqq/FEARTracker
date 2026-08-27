@@ -1,6 +1,7 @@
 import warnings
 from typing import Dict, Any
 
+import cv2
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
@@ -12,6 +13,8 @@ from model_training.utils import prepare_experiment, create_logger
 
 logger = create_logger(__name__)
 warnings.filterwarnings("ignore")
+cv2.setNumThreads(0)
+cv2.ocl.setUseOpenCL(False)
 
 
 def train(config: Dict[str, Any]) -> None:

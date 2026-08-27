@@ -3,4 +3,5 @@ num_workers: 4
 gpus: [ 0, 1, 2, 3 ]
 accelerator: ddp
 sync_bn: True
-precision: 32
+precision: 16
+prefetch_factor: 4

@@ -10,6 +10,8 @@ from torch.utils.data.dataloader import default_collate
 
 from model_training.utils.logger import create_logger
 
+from model_training.train.dataloader_utils import build_dataloader_kwargs, resolve_num_workers
+
 logger = create_logger(__name__)
 
 
@@ -117,18 +119,19 @@ class BaseLightningModel(pl.LightningModule):
 
         should_shuffle = (sampler is None) and (loader_name == "train")
         batch_size = self._get_batch_size(loader_name)
-        # Number of workers must not exceed batch size
-        num_workers = min(batch_size, self.config["num_workers"])
-        loader = DataLoader(
-            dataset=dataset,
+        num_workers = resolve_num_workers(self.config, loader_name)
+        loader_kwargs = build_dataloader_kwargs(
             batch_size=batch_size,
+            num_workers=num_workers,
             shuffle=should_shuffle,
             sampler=sampler,
-            num_workers=num_workers,
-            pin_memory=True,
             drop_last=drop_last,
             collate_fn=collate_fn,
+            pin_memory=self.config.get("pin_memory", True),
+            persistent_workers=self.config.get("persistent_workers", None),
+            prefetch_factor=self.config.get("prefetch_factor", 2),
         )
+        loader = DataLoader(dataset=dataset, **loader_kwargs)
         return loader
 
     def _get_batch_size(self, mode: str = "train") -> int:
