@@ -1,0 +1,10 @@
+# @package _global_
+# Throughput-oriented overrides. Loss/optimizer are unchanged.
+# Do not enable persistent_workers here: train samples are resampled each epoch.
+precision: 16
+num_workers: 8
+prefetch_factor: 4
+log_every_n_steps: 50
+train_metric_interval: 100
+check_val_every_n_epoch: 2
+best_worst_miner:

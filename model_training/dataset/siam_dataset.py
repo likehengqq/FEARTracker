@@ -29,6 +29,7 @@ class SiameseTrackingDataset(TrackingDataset):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.box_coder = FEARBoxCoder(config["tracker"])
+        self._color_aug = A.Compose(TRACKING_AUGMENTATIONS, additional_targets={"search_image": "image"})
 
     def _transform(self, item_data: Any) -> Any:
         search_presence = item_data["search_presence"]
@@ -62,6 +63,5 @@ class SiameseTrackingDataset(TrackingDataset):
         }
 
     def _add_color_augs(self, search_image: np.ndarray, template_image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        color_aug = A.Compose(TRACKING_AUGMENTATIONS, additional_targets={"search_image": "image"})
-        aug_res = color_aug(image=template_image, search_image=search_image)
+        aug_res = self._color_aug(image=template_image, search_image=search_image)
         return aug_res["image"], aug_res["search_image"]

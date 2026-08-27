@@ -1,9 +1,11 @@
 import random
 from typing import Tuple
 
-import cv2
 import numpy as np
 import torch
+
+from model_training.dataset.bbox_parse import parse_bbox
+from model_training.dataset.image_io import read_img
 
 
 def convert_center_to_bbox(center: np.array) -> np.array:
@@ -30,17 +32,6 @@ def get_regression_weight_label(
         np.where(dist_to_center < r_neg, 0.5 * np.ones_like(y), np.zeros_like(y)),
     )
     return torch.from_numpy(label)
-
-
-def read_img(path: str) -> np.array:
-    """
-    Args:
-        path: image path
-    Returns: image
-    """
-    img = cv2.imread(path)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return img.copy()
 
 
 def get_max_side_near_bbox(bbox: np.array, frame: np.array) -> Tuple[np.array, str]:

@@ -101,6 +101,7 @@ class BestWorstMinerCallback(BaseCallback):
         min_delta: float = 1e-4,
         metric_to_monitor: str = "loss",
         max_images: int = 16,
+        sample_interval: int = 20,
     ) -> None:
         """
         Args:
@@ -113,6 +114,7 @@ class BestWorstMinerCallback(BaseCallback):
         self.max_images = max_images
         self.metric_to_monitor = metric_to_monitor
         self.target_metric_minimize = target_metric_minimize
+        self.sample_interval = max(1, int(sample_interval))
         if target_metric_minimize:
             self.is_better = lambda score, best: score <= (best - min_delta)
             self.is_worse = lambda score, worst: score >= (worst + min_delta)
@@ -151,17 +153,23 @@ class BestWorstMinerCallback(BaseCallback):
 
         self.reset()
 
-    def _check_score(self, score: float, pl_module: pl.LightningModule, batch: Any) -> None:
-        if self.best_score is None or self.is_better(score, self.best_score):
+    def _check_score(self, score: float, pl_module: pl.LightningModule, batch: Any, cached_output: Any = None) -> None:
+        if not isinstance(batch, dict):
+            return
+        should_refresh_best = self.best_score is None or self.is_better(score, self.best_score)
+        should_refresh_worst = self.worst_score is None or self.is_worse(score, self.worst_score)
+        if not should_refresh_best and not should_refresh_worst:
+            return
+
+        outputs = cached_output if cached_output is not None else self._get_output(pl_module=pl_module, input=batch)
+        if should_refresh_best:
             self.best_score = score
             self.best_input = batch
-            outputs = self._get_output(pl_module=pl_module, input=batch)
             self.best_output = outputs
 
-        if self.worst_score is None or self.is_worse(score, self.worst_score):
+        if should_refresh_worst:
             self.worst_score = score
             self.worst_input = batch
-            outputs = self._get_output(pl_module=pl_module, input=batch)
             self.worst_output = outputs
 
     @torch.no_grad()
@@ -181,7 +189,10 @@ class BestWorstMinerCallback(BaseCallback):
         batch_idx: int,
         dataloader_idx: int,
     ) -> None:
-        if self.metric_to_monitor in outputs.keys():
+        # Sequence-level val batches are (paths, annotations, name), not training dicts.
+        if not isinstance(batch, dict):
+            return
+        if isinstance(outputs, dict) and self.metric_to_monitor in outputs:
             score = float(outputs[self.metric_to_monitor].cpu().item())
         else:
             metrics = trainer.logger_connector.logged_metrics
@@ -200,11 +211,19 @@ class BestWorstMinerCallback(BaseCallback):
         batch_idx: int,
         dataloader_idx: int,
     ) -> None:
+        if batch_idx % self.sample_interval != 0:
+            return
         metrics = trainer.logger_connector.logged_metrics
         score_key = f"train/{self.metric_to_monitor}"
         if score_key in metrics.keys():
             score = float(metrics[score_key])
-            self._check_score(score=score, pl_module=pl_module, batch=batch)
+            cached_output = getattr(pl_module, "_last_train_outputs", None)
+            self._check_score(
+                score=score,
+                pl_module=pl_module,
+                batch=batch,
+                cached_output=cached_output,
+            )
 
     def on_validation_epoch_end(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
         self._log_best_worst_batch("valid", pl_module)
@@ -217,11 +236,13 @@ class BestWorstMinerCallback(BaseCallback):
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> Optional["BestWorstMinerCallback"]:
-        if "best_worst_miner" not in config:
+        miner_cfg = config.get("best_worst_miner")
+        if not miner_cfg:
             return None
         return cls(
-            target_metric_minimize=config["best_worst_miner"]["metric_mode"] == "min",
-            metric_to_monitor=config["best_worst_miner"]["metric_to_monitor"],
-            min_delta=config["best_worst_miner"].get("min_delta", 1e-4),
-            max_images=config["best_worst_miner"].get("max_images", 16),
+            target_metric_minimize=miner_cfg["metric_mode"] == "min",
+            metric_to_monitor=miner_cfg["metric_to_monitor"],
+            min_delta=miner_cfg.get("min_delta", 1e-4),
+            max_images=miner_cfg.get("max_images", 16),
+            sample_interval=miner_cfg.get("sample_interval", 20),
         )

@@ -1,5 +1,6 @@
 # @package _global_
-num_workers: 1
+num_workers: 8
 accelerator:
 gpus: [ 0 ]
-precision: 32
+precision: 16
+prefetch_factor: 4

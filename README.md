@@ -101,6 +101,15 @@ PYTHONPATH=. python model_training/train.py backend=2gpu
 PYTHONPATH=. python model_training/train.py dataset=full_train backend=2gpu
 ```
 
+GPU backends use mixed precision (`precision: 16`), more DataLoader workers, and skip per-step box-decode metrics most of the time. The training loss and optimizer are unchanged.
+
+```shell
+# restore FP32
+PYTHONPATH=. python model_training/train.py backend=2gpu precision=32
+# extra throughput: validate every 2 epochs and disable best/worst visualization
+PYTHONPATH=. python model_training/train.py backend=2gpu utility_overrides=fast
+```
+
 ## Citation
 
 If you use the FEAR Tracker benchmark, demo, models or code for your research projects, please cite the following paper:

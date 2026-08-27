@@ -9,7 +9,7 @@ from hydra.utils import instantiate
 from torch.utils.data.dataloader import default_collate
 
 from model_training.dataset.aug import BBoxCropWithOffsets, PHOTOMETRIC_AUGMENTATIONS, get_normalize_fn
-from model_training.dataset.utils import handle_empty_bbox, read_img
+from model_training.dataset.utils import handle_empty_bbox, parse_bbox, read_img
 from model_training.utils.utils import ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop
 from model_training.utils.constants import (
     TRACKER_TARGET_SEARCH_FILENAME_KEY,
@@ -49,6 +49,11 @@ class TrackingDataset(ABC):
         self.max_deep_supervision_stride: Optional[int] = config.get("max_deep_supervision_stride", None)
         self.search_context = self.sizes_config["search_context"] * 2
         self.common_transforms = PHOTOMETRIC_AUGMENTATIONS
+        bbox_params = {"format": "coco", "min_visibility": 0, "label_fields": ["category_id"], "min_area": 0}
+        self._image_transform = A.Compose(
+            [*self.common_transforms, get_normalize_fn(self.config.get("normalize", "imagenet"))],
+            bbox_params=bbox_params,
+        )
 
     def __str__(self):
         return self.config["sampling"]["data_path"]
@@ -72,8 +77,8 @@ class TrackingDataset(ABC):
         template_image = read_img(os.path.join(self.config["root"], template_item["img_path"]))
         search_image = read_img(os.path.join(self.config["root"], search_item["img_path"]))
 
-        template_bbox = ensure_bbox_boundaries(eval(template_item["bbox"]), img_shape=template_image.shape[:2])
-        search_bbox = ensure_bbox_boundaries(eval(search_item["bbox"]), img_shape=search_image.shape[:2])
+        template_bbox = ensure_bbox_boundaries(parse_bbox(template_item["bbox"]), img_shape=template_image.shape[:2])
+        search_bbox = ensure_bbox_boundaries(parse_bbox(search_item["bbox"]), img_shape=search_image.shape[:2])
         return dict(
             template_image=template_image,
             template_bbox=template_bbox,
@@ -167,10 +172,7 @@ class TrackingDataset(ABC):
         3) get nearly centred centred crop from centred crop bbox using BBoxCropWithOffsets and apply changes to
         object bounding box and image
         """
-        full_aug_list = [*self.common_transforms, get_normalize_fn(self.config.get("normalize", "imagenet"))]
-        bbox_params = {"format": "coco", "min_visibility": 0, "label_fields": ["category_id"], "min_area": 0}
-        transform = A.Compose(full_aug_list, bbox_params=bbox_params)
-        result = transform(image=image, bboxes=[bbox], category_id=["bbox"])
+        result = self._image_transform(image=image, bboxes=[bbox], category_id=["bbox"])
         image, bbox = result["image"], np.array(result["bboxes"][0])
         return image, bbox
 
